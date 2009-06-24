@@ -2,19 +2,29 @@ This tests the service, and serves as something of an example::
 
     >>> from dc311 import Service
     >>> s = Service()
-    >>> all_types = sorted(s.get_types().values(), key=lambda st: st.code)
-    >>> for index, t in enumerate(all_types[:10]):
-    ...     print index, t
-    0 <ServiceType Parking Meters:0>
-    1 <ServiceType Dead Animal:11>
-    2 <ServiceType Graffiti:GRAFF>
-    3 <ServiceType How Am I Driving? (Compliment):HMDCM>
-    4 <ServiceType How Am I Driving? (Complaint):HMDCP>
-    5 <ServiceType Residential Parking Permit:RPP>
-    6 <ServiceType Abandoned Vehicles:S0000>
-    7 <ServiceType Alley Cleaning:S0011>
-    8 <ServiceType Alley Repair:S0016>
-    9 <ServiceType Abandoned Bicycles:S0021>
-    >>> abandoned = all_types[6]
+    >>> types = s.get_types()
+    >>> for t in sorted(types.values(), key=lambda st: st.code)[:10]:
+    ...     print t
+    <ServiceType Parking Meters:0>
+    <ServiceType Dead Animal:11>
+    <ServiceType Graffiti:GRAFF>
+    <ServiceType How Am I Driving? (Compliment):HMDCM>
+    <ServiceType How Am I Driving? (Complaint):HMDCP>
+    <ServiceType Residential Parking Permit:RPP>
+    <ServiceType Abandoned Vehicles:S0000>
+    <ServiceType Alley Cleaning:S0011>
+    <ServiceType Alley Repair:S0016>
+    <ServiceType Abandoned Bicycles:S0021>
+    >>> abandoned = types['S0000']
     >>> abandoned.definition().questions[0]
     <ServiceTypeQuestion name=ABDVHL-DAMAGE prompt='Is there damage to the vehicle  (no tags, broken windows, flat tires, no tires, etc.)?' required type=TextBox width=200>
+    >>> dead = types['11']
+    >>> dead.definition()
+    <Definition Dead Animal:11 q=[<ServiceTypeQuestion name=DEDANM-KIND prompt='What kind of animal is it?' required type=TextBox width=200>]>
+    >>> token = s.submit('XXX', description='It scares me!', DEDANM_KIND='Ant')
+    >>> assert token and isinstance(token, str)
+    >>> request_id = s.get_from_token(token)
+    >>> print request_id
+    123456
+    >>> print s.get(request_id)
+    <ServiceRequest 123456 code='S0001' codedescription='ABANDONED VEHICLES (PUBLIC)' typecode='AA' typecodedescription='ABANDONED AUTO' priority=None orderstatus='OVERDUE CLOSED' agencyabbreviation='DPW' notes='INVESTIGATED UNDER PCN NUMBER\n\n\n01071060 NISS POSTED ON 3/15 GOA ON 3/29.\n\n\n\n01071061 DODGE GOA 3/15/01' resolutiondate=2001-03-29 08:39:00 orderdate=2001-03-08 15:17:00 duedate=2001-03-28 20:05:00 aid='244012' resolution='NOT FOUND'>

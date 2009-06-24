@@ -1,6 +1,8 @@
 import httplib2
 import urllib
 import urlparse
+from datetime import datetime
+import time
 try:
     import simplejson
 except ImportError:
@@ -121,26 +123,51 @@ class Service(object):
         for item in definition:
             item = merge_dict(item['servicetype'])
             servicetype = item['servicetype']
+            if item['name'] == 'NULL':
+                continue
             questions.append(self.ServiceTypeQuestion(
                 name=item['name'],
                 prompt=item['prompt'],
                 required=asbool(item['required']),
-                type=item['type'].strip(),
+                type=clean_str(item['type']),
                 width=asint(item.get('width')),
                 itemlist=aslist(item.get('itemlist'))
                 ))
         return self.Definition(servicetype, servicecode, questions)
     
     def get(self, servicerequestid):
-        return self._call_method('get', servicerequestid=servicerequestid)
+        result = self._call_method('get', servicerequestid=servicerequestid)
+        result = merge_dict(result['servicerequest'])
+        #assert 0, result
+        return ServiceRequest(
+            code=result['servicecode'],
+            codedescription=result['servicecodedescription'],
+            typecode=result['servicetypeocode'],
+            typecodedescription=result['servicetypecodedescription'],
+            priority=clean_str(result['servicepriority']),
+            orderstatus=result['serviceorderstatus'],
+            agencyabbreviation=result['agencyabbreviation'],
+            notes=clean_str(result['servicenotes']),
+            resolutiondate=as_date(result['resolutiondate']),
+            orderdate=as_date(result['serviceorderdate']),
+            duedate=as_date(result['serviceduedate']),
+            aid=result['aid'],
+            request_id=result['servicerequestid'],
+            resolution=clean_str(result['resolution']))
 
     def submit(self, aid, description, **params):
+        for name in params.keys():
+            if name.upper() == name:
+                new_name = name.replace('_', '-')
+                params[new_name] = params.pop(name)
         params['aid'] = aid
         params['description'] = description
-        return self._call_method('submit', method='POST', **params)
+        result = self._call_method('submit', method='POST', **params)
+        return result['token']
 
     def get_from_token(self, token):
-        return self._call_method('getFromToken', token=token)
+        result = self._call_method('getFromToken', token=token)
+        return result['servicerequestid']
     
 class ServiceType(object):
     """Represents a service request type.  Call :method:`definition()`
@@ -211,6 +238,44 @@ class Definition(object):
             self.questions)
 
 Service.Definition = Definition
+
+class ServiceRequest(object):
+    def __init__(self, code, codedescription,
+                 typecode, typecodedescription,
+                 priority, orderstatus, agencyabbreviation,
+                 notes, resolutiondate,
+                 orderdate, duedate, aid, request_id,
+                 resolution):
+        self.code = code
+        self.codedescription = codedescription
+        self.typecode = typecode
+        self.typecodedescription = typecodedescription
+        self.priority = priority
+        self.orderstatus = orderstatus
+        self.agencyabbreviation = agencyabbreviation
+        self.notes = notes
+        self.resolutiondate = resolutiondate
+        self.orderdate = orderdate
+        self.duedate = duedate
+        self.aid = aid
+        self.request_id = request_id
+        self.resolution=resolution
+
+    def __repr__(self):
+        args = []
+        for key in ('code codedescription typecode typecodedescription '
+                    'priority orderstatus agencyabbreviation notes '
+                    'resolutiondate orderdate duedate aid resolution').split():
+            value = getattr(self, key)
+            if isinstance(value, datetime):
+                value = value.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                value = repr(value)
+            args.append('%s=%s' % (key, value))
+        return '<%s %s %s>' % (
+            self.__class__.__name__,
+            self.request_id,
+            ' '.join(args))
     
 def asbool(value):
     """Converts a string to a boolean"""
@@ -219,7 +284,7 @@ def asbool(value):
     value = value.strip().lower()
     if value in ('1', 'y', 'yes', 't', 'true', 'on'):
         return True
-    if value in ('0', 'n', 'no', 'f', 'false', 'off'):
+    if value in ('0', 'n', 'no', 'f', 'false', 'off', 'null'):
         return False
     raise ValueError('Unknown boolean: %r' % value)
 
@@ -241,3 +306,15 @@ def merge_dict(dicts):
     for item in dicts[1:]:
         d.update(item)
     return d
+
+def clean_str(s):
+    if s == 'NO VALUE ASSIGNED':
+        return None
+    if s == 'NULL':
+        return None
+    return s.strip().replace('\r\n', '\n')
+
+def as_date(s):
+    if not s or s == 'NULL':
+        return None
+    return datetime.fromtimestamp(time.mktime(time.strptime(s, '%Y-%m-%d %H:%M:%S')))
