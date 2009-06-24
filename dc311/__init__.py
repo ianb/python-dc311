@@ -38,12 +38,16 @@ class Service(object):
     default_base_url = 'http://api.dc.gov/open311/v1/'
 
     def __init__(self, base_url=default_base_url,
-                 apikey=None, http=http):
+                 apikey=None, http=http, **classes):
         if not base_url.endswith('/'):
             base_url += '/'
         self.base_url = base_url
         self.apikey = apikey
         self.http = http
+        for name, value in classes.items():
+            if not hasattr(self, name):
+                raise TypeError('Bad keyword argument: %s=%r' % (name, value))
+            setattr(self, name, value)
 
     def __repr__(self):
         args = []
@@ -57,11 +61,14 @@ class Service(object):
             self.__class__.__name__, ''.join(args))
 
     def is_default(self):
+        """True if this instance was instantiated (effectively) with
+        no arguments"""
         return (self.base_url == self.default_base_url
                 and not self.apikey
                 and self.http is http)
     
-    def request(self, url, method='GET', **params):
+    def _request(self, url, method='GET', **params):
+        """Call a request"""
         req_headers = {'Accept': 'application/json'}
         if self.apikey:
             params.setdefault('apikey', apikey)
@@ -82,12 +89,18 @@ class Service(object):
             raise RequestError('Error', url=url, headers=headers, body=body, req_body=req_body)
         return simplejson.loads(body)
     
-    def call_method(self, method_name, method='GET', **params):
+    def _call_method(self, method_name, method='GET', **params):
+        """Call a method, returning the parsed JSON response"""
         url = urlparse.urljoin(self.base_url, method_name+'.json')
-        return self.request(url, method=method, **params)
+        return self._request(url, method=method, **params)
 
     def get_types(self):
-        types = self.call_method('meta_getTypesList')
+        """Get all the service request types, returned as a dictionary.
+
+        The dictionary uses the service request code as the key, and a
+        :class:`ServiceType` object as the value.
+        """
+        types = self._call_method('meta_getTypesList')
         types_list = types['servicetypeslist']
         result = {}
         for item in types_list:
@@ -96,18 +109,19 @@ class Service(object):
             assert len(item) == 2
             t = item[0]['servicetype']
             code = item[1]['servicecode']
-            result[code] = ServiceType(self, t, code)
+            result[code] = self.ServiceType(self, t, code)
         return result
 
     def get_type_definition(self, servicecode):
-        definition = self.call_method('meta_getTypeDefinition', servicecode=servicecode)
+        """Get the :class:`Definition` for the given service request type"""
+        definition = self._call_method('meta_getTypeDefinition', servicecode=servicecode)
         definition = definition['servicetypedefinition']
         servicetype = None
         questions = []
         for item in definition:
             item = merge_dict(item['servicetype'])
             servicetype = item['servicetype']
-            questions.append(ServiceTypeQuestion(
+            questions.append(self.ServiceTypeQuestion(
                 name=item['name'],
                 prompt=item['prompt'],
                 required=asbool(item['required']),
@@ -115,20 +129,22 @@ class Service(object):
                 width=asint(item.get('width')),
                 itemlist=aslist(item.get('itemlist'))
                 ))
-        return Definition(servicetype, servicecode, questions)
+        return self.Definition(servicetype, servicecode, questions)
     
     def get(self, servicerequestid):
-        return self.call_method('get', servicerequestid=servicerequestid)
+        return self._call_method('get', servicerequestid=servicerequestid)
 
     def submit(self, aid, description, **params):
         params['aid'] = aid
         params['description'] = description
-        return self.call_method('submit', method='POST', **params)
+        return self._call_method('submit', method='POST', **params)
 
     def get_from_token(self, token):
-        return self.call_method('getFromToken', token=token)
+        return self._call_method('getFromToken', token=token)
     
 class ServiceType(object):
+    """Represents a service request type.  Call :method:`definition()`
+    to get the full definition."""
 
     def __init__(self, service, type, code):
         self.service = service
@@ -152,7 +168,11 @@ class ServiceType(object):
             self._definition = self.service.get_type_definition(self.code)
         return self._definition
 
+Service.ServiceType = ServiceType
+
 class ServiceTypeQuestion(object):
+    """Represents one question that may need to be answered to submit
+    a service request"""
     def __init__(self, name, prompt, required, type, width, itemlist):
         self.name = name
         self.prompt = prompt
@@ -174,7 +194,10 @@ class ServiceTypeQuestion(object):
         return '<%s %s>' % (self.__class__.__name__,
                             ' '.join(args))
 
+Service.ServiceTypeQuestion = ServiceTypeQuestion
+
 class Definition(object):
+    """Represents the richer definition of a :class:`ServiceType`"""
 
     def __init__(self, type, code, questions):
         self.type = type
@@ -186,8 +209,11 @@ class Definition(object):
             self.__class__.__name__,
             self.type, self.code,
             self.questions)
+
+Service.Definition = Definition
     
 def asbool(value):
+    """Converts a string to a boolean"""
     if not isinstance(value, basestring):
         return bool(value)
     value = value.strip().lower()
@@ -198,11 +224,13 @@ def asbool(value):
     raise ValueError('Unknown boolean: %r' % value)
 
 def asint(value):
-    if value is None or value == '':
+    """Converts a string to an int, except empty strings"""
+    if value is None or value == '' or value == 'NULL':
         return None
     return int(value)
 
 def aslist(value):
+    """Converts a comma-separated string into a list"""
     value = value.strip()
     if not value:
         return None
