@@ -1,0 +1,20 @@
+This tests the service, and serves as something of an example::
+
+    >>> from dc311 import Service
+    >>> s = Service()
+    >>> all_types = sorted(s.get_types(), key=lambda st: st.code)
+    >>> for index, t in enumerate(all_types[:10]):
+    ...     print index, t
+    0 <ServiceType Parking Meters:0>
+    1 <ServiceType Dead Animal:11>
+    2 <ServiceType Graffiti:GRAFF>
+    3 <ServiceType How Am I Driving? (Compliment):HMDCM>
+    4 <ServiceType How Am I Driving? (Complaint):HMDCP>
+    5 <ServiceType Residential Parking Permit:RPP>
+    6 <ServiceType Abandoned Vehicles:S0000>
+    7 <ServiceType Alley Cleaning:S0011>
+    8 <ServiceType Alley Repair:S0016>
+    9 <ServiceType Abandoned Bicycles:S0021>
+    >>> abandoned = all_types[6]
+    >>> abandoned.definition().questions[0]
+    <ServiceTypeQuestion name=ABDVHL-DAMAGE prompt='Is there damage to the vehicle  (no tags, broken windows, flat tires, no tires, etc.)?' required type=TextBox width=200>
