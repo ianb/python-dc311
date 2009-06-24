@@ -2,7 +2,7 @@ This tests the service, and serves as something of an example::
 
     >>> from dc311 import Service
     >>> s = Service()
-    >>> all_types = sorted(s.get_types(), key=lambda st: st.code)
+    >>> all_types = sorted(s.get_types().values(), key=lambda st: st.code)
     >>> for index, t in enumerate(all_types[:10]):
     ...     print index, t
     0 <ServiceType Parking Meters:0>

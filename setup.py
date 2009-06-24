@@ -18,9 +18,7 @@ setup(name='dc311',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-          # -*- Extra requirements: -*-
+        'httplib2',
+        'simplejson',
       ],
-      entry_points="""
-      # -*- Entry points: -*-
-      """,
       )
