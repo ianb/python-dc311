@@ -73,7 +73,7 @@ class Service(object):
         """Call a request"""
         req_headers = {'Accept': 'application/json'}
         if self.apikey:
-            params.setdefault('apikey', apikey)
+            params.setdefault('apikey', self.apikey)
         req_body = None
         if params and method == 'GET':
             if '?' in url:
